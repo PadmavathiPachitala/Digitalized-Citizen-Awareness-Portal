@@ -24,8 +24,15 @@ const PROJECT_ROOT = path.resolve(__dirname, '..');
 
 const app = express();
 
+// Trust Render's reverse proxy so rate limiting works per-user, not globally
+app.set('trust proxy', 1);
+
 app.use(securityHeaders);
 app.use(corsMiddleware);
+
+// Serve static files BEFORE rate limiting so images/css don't eat up the limit
+app.use(express.static(PROJECT_ROOT));
+
 app.use(rateLimiter);
 app.use(express.json({ limit: '1mb' }));
 
@@ -35,7 +42,6 @@ app.use((req, _res, next) => {
   next();
 });
 
-app.use(express.static(PROJECT_ROOT));
 app.locals.indexFile = path.join(PROJECT_ROOT, 'index.html');
 
 app.use('/api/health', healthRouter);
