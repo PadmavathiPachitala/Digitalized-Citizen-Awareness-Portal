@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Supabase Data Importer | DCAP</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: rgba(255, 255, 255, 0.03);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --primary: #4f46e5;
+      --primary-hover: #6366f1;
+      --text: #f3f4f6;
+      --text-muted: #9ca3af;
+      --success: #10b981;
+      --error: #ef4444;
+      --warning: #f59e0b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: radial-gradient(circle at 50% 0%, #1e1b4b 0%, var(--bg) 70%);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      overflow-x: hidden;
+    }
+
+    .container {
+      max-width: 900px;
+      width: 100%;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(20px);
+      border-radius: 24px;
+      padding: 3rem;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      animation: fadeIn 0.8s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(to right, #a5b4fc, #818cf8, #6366f1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-align: center;
+    }
+
+    p.subtitle {
+      color: var(--text-muted);
+      text-align: center;
+      margin-bottom: 2.5rem;
+      font-size: 1.1rem;
+    }
+
+    .config-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+      margin-bottom: 2.5rem;
+      background: rgba(0, 0, 0, 0.2);
+      padding: 1.5rem;
+      border-radius: 16px;
+      border: 1px solid var(--card-border);
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    label {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    input {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      padding: 0.8rem 1rem;
+      border-radius: 8px;
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.9rem;
+      width: 100%;
+      transition: all 0.3s;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
+    }
+
+    .actions {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 2.5rem;
+    }
+
+    .btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 1rem 3rem;
+      border-radius: 12px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
+    }
+
+    .btn:hover:not(:disabled) {
+      background: var(--primary-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(79, 70, 229, 0.6);
+    }
+
+    .btn:disabled {
+      background: #374151;
+      color: #9ca3af;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .tables-status {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2.5rem;
+    }
+
+    .table-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--card-border);
+      padding: 1.2rem;
+      border-radius: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: all 0.3s;
+    }
+
+    .table-card.active {
+      border-color: var(--primary);
+      background: rgba(79, 70, 229, 0.05);
+    }
+
+    .table-card.success {
+      border-color: var(--success);
+      background: rgba(16, 185, 129, 0.05);
+    }
+
+    .table-card.error {
+      border-color: var(--error);
+      background: rgba(239, 68, 68, 0.05);
+    }
+
+    .table-name {
+      font-weight: 600;
+    }
+
+    .table-badge {
+      font-size: 0.8rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .badge-pending { background: #374151; color: #9ca3af; }
+    .badge-running { background: var(--primary); color: white; animation: pulse 1.5s infinite; }
+    .badge-success { background: var(--success); color: white; }
+    .badge-error { background: var(--error); color: white; }
+
+    @keyframes pulse {
+      0% { opacity: 0.6; }
+      50% { opacity: 1; }
+      100% { opacity: 0.6; }
+    }
+
+    .console-panel {
+      background: #020617;
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      height: 300px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.8);
+    }
+
+    .log-line {
+      line-height: 1.5;
+    }
+
+    .log-info { color: #38bdf8; }
+    .log-success { color: #34d399; }
+    .log-error { color: #f87171; }
+    .log-warn { color: #fbbf24; }
+
+    .help-box {
+      margin-top: 2rem;
+      background: rgba(245, 158, 11, 0.05);
+      border: 1px dashed var(--warning);
+      padding: 1.5rem;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+
+    .help-box strong {
+      color: var(--warning);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>Supabase Data Importer</h1>
+    <p class="subtitle">Push CSV dataset directly to your Supabase instance from the browser</p>
+
+    <div class="config-grid">
+      <div class="input-group">
+        <label for="sb-url">Supabase Project URL</label>
+        <input type="text" id="sb-url" value="https://fxdgvyjbciqzfzwxjqjt.supabase.co">
+      </div>
+      <div class="input-group">
+        <label for="sb-key">Supabase Key (Service Role Key recommended)</label>
+        <input type="password" id="sb-key" value="sb_publishable_fbNfohfS5GsJ7I2m4VXwig_K8YMyXse">
+      </div>
+    </div>
+
+    <div class="tables-status" id="status-container">
+      <!-- Status cards will be rendered here -->
+    </div>
+
+    <div class="actions">
+      <button class="btn" id="start-btn">Start Seeding Database</button>
+    </div>
+
+    <div class="console-panel" id="console">
+      <div class="log-line log-info">&gt; Ready to seed. Click the button above to begin.</div>
+    </div>
+
+    <div class="help-box">
+      <strong>⚠️ Row-Level Security Note:</strong> If your tables have Row-Level Security (RLS) enabled, using an <em>Anon/Publishable Key</em> will fail with permission errors. It is highly recommended to paste your <strong>Service Role Secret Key</strong> above to bypass RLS policies during the import.
+    </div>
+  </div>
+
+  <!-- Load Supabase JS Client from CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <script>
+    // Embedded real data from the 8 CSV files
+    const dataset = {
+      schemes: [
+        {"id":"scheme_csv_001","key":"pm-kushal-vikas","slug":"pm-kushal-vikas","name":"Pradhan Mantri Kaushal Vikas Yojana (PMKVY)","category":"Skill Development","audience":"youth","description":"Skill certification scheme aiming to enable a large number of Indian youth to take up industry-relevant skill training.","eligibility":"Any unemployed youth or school/college dropouts who are citizens of India.","documents":"Aadhaar Card, Bank Account Details, Education Certificates, Passport Size Photographs","benefits":"Free skill training, assessment, and certification. Financial rewards upon successful completion and placement assistance.","process":"Register online on the PMKVY portal, choose a training center and course, complete training, and appear for the assessment.","apply_link":"https://www.pmkvyofficial.org/","state":"All India","language":"en"},
+        {"id":"scheme_csv_002","key":"pm-suraksha-bima","slug":"pm-suraksha-bima","name":"Pradhan Mantri Suraksha Bima Yojana (PMSBY)","category":"Insurance","audience":"public","description":"Government-backed accident insurance scheme in India targeting a wide section of the population.","eligibility":"All savings bank account holders aged between 18 and 70 years.","documents":"Aadhaar Card, Bank Account Details, KYC Documents","benefits":"Accidental death and full disability cover of Rs. 2 Lakh; partial disability cover of Rs. 1 Lakh.","process":"Submit the application form to your bank or register through internet banking with auto-debit consent.","apply_link":"https://www.jansuraksha.gov.in/","state":"All India","language":"en"},
+        {"id":"scheme_csv_003","key":"pm-jeevan-jyoti","slug":"pm-jeevan-jyoti","name":"Pradhan Mantri Jeevan Jyoti Bima Yojana (PMJJBY)","category":"Insurance","audience":"public","description":"Government-backed life insurance scheme in India providing annual term life insurance.","eligibility":"All savings bank account holders aged between 18 and 50 years.","documents":"Aadhaar Card, Bank Account Details, Health Declaration Form","benefits":"Life cover of Rs. 2 Lakh in case of death of the insured due to any reason.","process":"Fill the PMJJBY enrollment form at your banking branch or apply online via net banking.","apply_link":"https://www.jansuraksha.gov.in/","state":"All India","language":"en"},
+        {"id":"scheme_csv_004","key":"stand-up-india","slug":"stand-up-india","name":"Stand-Up India Scheme","category":"Business & Entrepreneurship","audience":"entrepreneurs","description":"Scheme promoting entrepreneurship among women and Scheduled Castes or Scheduled Tribes.","eligibility":"SC/ST and/or women entrepreneurs above 18 years of age. Loan only for greenfield projects.","documents":"Identity Proof, Address Proof, Business Plan, Caste Certificate (if applicable), Assets & Liabilities Statement","benefits":"Bank loans between Rs. 10 Lakh and Rs. 1 Crore for setting up a greenfield enterprise.","process":"Apply online at Stand-Up India portal, connect with a branch counselor, and submit the loan application form.","apply_link":"https://www.standupmitra.in/","state":"All India","language":"en"},
+        {"id":"scheme_csv_005","key":"pm-mudra-yojana","slug":"pm-mudra-yojana","name":"Pradhan Mantri MUDRA Yojana (PMMY)","category":"Business & Entrepreneurship","audience":"entrepreneurs","description":"Provides loans up to Rs. 10 Lakh to non-corporate, non-farm small/micro enterprises.","eligibility":"Any Indian citizen having a business plan for a non-farm sector income-generating activity.","documents":"MUDRA Application Form, Identity/Address Proof, Business Identity Proof, 2 Passport Photos","benefits":"Collateral-free loans under three categories: Shishu (up to 50k), Kishor (50k-5L), and Tarun (5L-10L).","process":"Approach a commercial bank, RRB, MFI, or cooperative bank, or apply online via Udyami Mitra portal.","apply_link":"https://www.mudra.org.in/","state":"All India","language":"en"},
+        {"id":"scheme_csv_006","key":"pm-ujjwala-yojana","slug":"pm-ujjwala-yojana","name":"Pradhan Mantri Ujjwala Yojana (PMUY)","category":"Social Welfare","audience":"women","description":"Provides clean cooking fuel (LPG connections) to women from BPL (Below Poverty Line) households.","eligibility":"Adult woman belonging to a poor household without an existing LPG connection in the name of any family member.","documents":"Aadhaar Card, BPL Ration Card, Bank Account Details, Address Proof","benefits":"Free LPG connection with financial support of Rs. 1,600 per connection plus interest-free loan for stove/refill.","process":"Submit application form at nearest LPG distributor or apply online through the PMUY website.","apply_link":"https://www.pmuy.gov.in/","state":"All India","language":"en"},
+        {"id":"scheme_csv_007","key":"sukanya-samriddhi","slug":"sukanya-samriddhi","name":"Sukanya Samriddhi Yojana (SSY)","category":"Women Empowerment","audience":"parent","description":"A small deposit scheme for the girl child, launched under the 'Beti Bachao Beti Padhao' campaign.","eligibility":"Parents or legal guardians of a girl child aged 10 years or below. Maximum 2 accounts per family.","documents":"Girl Child's Birth Certificate, Parent's Identity and Address Proof, Photo","benefits":"High interest rate, tax benefits under Section 80C, and a maturity payout when the girl turns 21.","process":"Open account at any post office or authorized commercial bank branches by submitting the form and deposit.","apply_link":"https://www.indiapost.gov.in/","state":"All India","language":"en"},
+        {"id":"scheme_csv_008","key":"pm-svanidhi","slug":"pm-svanidhi","name":"PM SVANidhi Scheme","category":"Business & Entrepreneurship","audience":"vendors","description":"Special micro-credit facility scheme for providing affordable working capital loans to street vendors.","eligibility":"Urban street vendors vending in urban areas on or before March 24, 2020.","documents":"Aadhaar Card, Voter Card, Street Vendor ID Card or Letter of Recommendation (LoR)","benefits":"Working capital loan up to Rs. 10,000 for 1st tranche, Rs. 20,000 for 2nd tranche, and Rs. 50,000 for 3rd tranche.","process":"Apply online through PM SVANidhi Portal, or via a Banking Correspondent (BC)/Common Service Centre (CSC).","apply_link":"https://pmsvanidhi.mohua.gov.in/","state":"All India","language":"en"},
+        {"id":"scheme_csv_009","key":"day-nrlm","slug":"day-nrlm","name":"Deendayal Antyodaya Yojana - NRLM","category":"Livelihoods","audience":"rural","description":"Organizes rural poor households into Self Help Groups (SHGs) and supports them for livelihoods.","eligibility":"At least one member from each rural poor household (preferably a woman) to be brought under SHG network.","documents":"SHG Member details, Aadhaar Card, Bank Account, Ration Card","benefits":"Revolving fund, community investment fund support, interest subvention on loans, and capacity building.","process":"Form a Self Help Group, register with block mission management unit, open bank account, and apply for revolving fund.","apply_link":"https://aajeevika.gov.in/","state":"All India","language":"en"},
+        {"id":"scheme_csv_010","key":"janani-suraksha","slug":"janani-suraksha","name":"Janani Suraksha Yojana (JSY)","category":"Health & Family Welfare","audience":"pregnant_women","description":"Safe motherhood intervention promoting institutional delivery among poor pregnant women.","eligibility":"All pregnant women belonging to BPL/SC/ST households delivering in government or accredited private health facilities.","documents":"JSY Card, Bank Account Details, Address Proof, BPL Card","benefits":"Cash assistance of Rs. 1,400 in rural areas and Rs. 700 in urban areas to the mother, and incentives to ASHA workers.","process":"Register with the local auxiliary nurse midwife (ANM) or ASHA worker, fill JSY form, and deliver at institutional facility.","apply_link":"https://nhm.gov.in/","state":"All India","language":"en"},
+        {"id":"scheme_csv_011","key":"pm-vishwakarma","slug":"pm-vishwakarma","name":"PM Vishwakarma Scheme","category":"Skill Development","audience":"artisans","description":"Provides end-to-end support to artisans and craftspeople who work with their hands and tools.","eligibility":"An artisan or craftsperson working in one of the 18 family-based traditional trades.","documents":"Aadhaar Card, Mobile Number, Bank Details, Ration Card, Skill Certificate (if any)","benefits":"Biometric registration, PM Vishwakarma Certificate, skill upgrading, toolkit incentive of Rs. 15,000, credit support up to Rs. 3 Lakh.","process":"Apply online at CSC or the PM Vishwakarma portal, complete three-step verification, and obtain certificate.","apply_link":"https://pmvishwakarma.gov.in/","state":"All India","language":"en"},
+        {"id":"scheme_csv_012","key":"pm-awas-yojana-urban","slug":"pm-awas-yojana-urban","name":"Pradhan Mantri Awas Yojana - Urban (PMAY-U)","category":"Housing","audience":"public","description":"Aims to provide all-weather pucca houses to eligible urban households.","eligibility":"Beneficiary family should not own a pucca house in their name anywhere in India. Annual income rules apply.","documents":"Aadhaar Card, Voter Card, Pan Card, Bank Account details, Income Certificate, Land ownership documents","benefits":"Interest subsidy on home loans, financial assistance for house construction/enhancement.","process":"Apply online through the PMAY-U portal or submit application via a Common Service Centre (CSC).","apply_link":"https://pmaymis.gov.in/","state":"All India","language":"en"},
+        {"id":"scheme_csv_013","key":"pm-awas-yojana-gramin","slug":"pm-awas-yojana-gramin","name":"Pradhan Mantri Awas Yojana - Gramin (PMAY-G)","category":"Housing","audience":"rural","description":"Aims to provide a pucca house with basic amenities to all houseless households in rural areas.","eligibility":"Rural families living in kutcha/dilapidated houses as per SECC database.","documents":"Aadhaar Card, Bank Account details, Swachh Bharat Mission registration number, Job card number","benefits":"Financial assistance of Rs. 1.2 Lakh in plains and Rs. 1.3 Lakh in hilly/difficult areas for house construction.","process":"Beneficiary list generated based on SECC data. Gram Sabha validates list. Local administration contacts beneficiaries.","apply_link":"https://pmayg.nic.in/","state":"All India","language":"en"},
+        {"id":"scheme_csv_014","key":"atal-pension-yojana","slug":"atal-pension-yojana","name":"Atal Pension Yojana (APY)","category":"Pension","audience":"public","description":"Pension scheme focused on the unorganized sector workers to secure their old age.","eligibility":"All citizens of India aged between 18 and 40 years holding a savings bank account.","documents":"Aadhaar Card, Bank Account Details, Mobile Number","benefits":"Minimum guaranteed monthly pension of Rs. 1,000, 2,000, 3,000, 4,000, or 5,000 after the age of 60.","process":"Approach the bank where savings account is held, fill APY registration form, and opt for auto-debit.","apply_link":"https://www.npscra.nsdl.co.in/","state":"All India","language":"en"},
+        {"id":"scheme_csv_015","key":"pm-kisan-maan-dhan","slug":"pm-kisan-maan-dhan","name":"PM Kisan Maan-Dhan Yojana","category":"Pension","audience":"farmers","description":"Pension scheme to secure the lives of Small and Marginal Farmers in their old age.","eligibility":"Small and marginal farmers owning cultivable land up to 2 hectares, aged 18 to 40 years.","documents":"Aadhaar Card, Bank Account Details, Land Possession Document, KCC Card (optional)","benefits":"Minimum assured pension of Rs. 3,000 per month after attaining the age of 60 years.","process":"Apply online at nearest CSC or PM-KMDY portal. Farmers make monthly contribution matched by Central Government.","apply_link":"https://maandhan.in/","state":"All India","language":"en"},
+        {"id":"scheme_csv_016","key":"ladli-behna-yojana","slug":"ladli-behna-yojana","name":"Ladli Behna Yojana","category":"Women Welfare","audience":"women","description":"State level scheme to support the health and economic independence of women.","eligibility":"Women residents of the specific state (e.g., MP) aged 21 to 60 years. Income limitations apply.","documents":"Samagra ID (if applicable), Aadhaar Card, Bank Account (DBT enabled), Photo","benefits":"Monthly financial aid of Rs. 1,250 transferred directly to the beneficiary's bank account.","process":"Submit applications at ward offices or through local camps, complete e-KYC, and verify registration.","apply_link":"https://cmladlibahna.mp.gov.in/","state":"Madhya Pradesh","language":"en"},
+        {"id":"scheme_csv_017","key":"pm-egp","slug":"pm-egp","name":"Prime Minister's Employment Generation Programme (PMEGP)","category":"Employment","audience":"entrepreneurs","description":"Credit-linked subsidy program for generating self-employment opportunities through micro-enterprises.","eligibility":"Any individual above 18 years of age. At least VIII standard pass for project costs above 10 Lakh.","documents":"Aadhaar, Project Report, Education Certificate, Caste/Special Category Certificate, PAN","benefits":"Subsidy of 15% to 35% on project costs up to Rs. 50 Lakh for manufacturing and Rs. 20 Lakh for service sector.","process":"Apply online on the KVIC website, upload required documents, bank evaluates project and sanctions loan.","apply_link":"https://www.kviconline.gov.in/pmegpeportal/","state":"All India","language":"en"},
+        {"id":"scheme_csv_018","key":"digital-india-internship","slug":"digital-india-internship","name":"Digital India Internship Scheme","category":"Education & Career","audience":"students","description":"Provides learning opportunities to students in the area of Electronics and IT policies/projects.","benefits":"Practical exposure in Ministry of Electronics and IT, monthly stipend of Rs. 10,000, and internship certificate.","eligibility":"B.E/B.Tech/M.E/M.Tech/MCA/M.Sc (IT) students with minimum 60% marks in degree/class XII.","documents":"College Recommendation Letter, Marksheets, Aadhaar Card, Resume","process":"Apply online during the active application window on MeitY portal and undergo screening interview.","apply_link":"https://www.meity.gov.in/","state":"All India","language":"en"},
+        {"id":"scheme_csv_019","key":"national-safai-karamcharis","slug":"national-safai-karamcharis","name":"NSKFDC Loan Schemes","category":"Social Welfare","audience":"safai_karamcharis","description":"Financial assistance schemes for socio-economic upliftment of Safai Karamcharis and Scavengers.","eligibility":"Safai Karamcharis, manual scavengers, and their dependents. No income limit applies.","documents":"Identity/Address Proof, Occupation Certificate from local authority, Bank Passbook, Aadhaar","benefits":"Concessional loans at low interest rates (4% to 6%) for starting self-employment ventures.","process":"Apply through State Channelising Agencies (SCAs), Regional Rural Banks, or designated nationalized banks.","apply_link":"https://nskfdc.nic.in/","state":"All India","language":"en"},
+        {"id":"scheme_csv_020","key":"post-matric-sc-students","slug":"post-matric-sc-students","name":"Post Matric Scholarship for SC Students","category":"Education","audience":"students","description":"Financial assistance to Scheduled Caste students studying at post-matriculation or post-secondary stages.","eligibility":"SC students whose parents' annual income does not exceed Rs. 2.5 Lakh.","documents":"Caste Certificate, Income Certificate, Academic Marksheets, Fee Receipt, Bank Details, Aadhaar","benefits":"100% compulsory non-refundable fees and maintenance allowance paid directly to student bank accounts.","process":"Register and apply on the National Scholarship Portal or State Scholarship Portal during active dates.","apply_link":"https://scholarships.gov.in/","state":"All India","language":"en"}
+      ],
+      documents: [
+        {"id":"passport","name":"Indian Passport","purpose":"Official travel document for leaving and re-entering India","documents_required":["Proof of Address (Aadhaar/Utility Bill)","Proof of Date of Birth (Birth Certificate/10th Marksheet)","Photo Identity Proof","Non-ECR proof if applicable"],"process":["Register on the Passport Seva Online Portal","Login and fill the application form online","Pay the required fee and schedule an appointment at the nearest PSK","Visit the Passport Seva Kendra with original documents","Complete the police verification process at your residence","Receive passport via speed post after verification"],"link":"https://www.passportindia.gov.in/"},
+        {"id":"voter_id","name":"Voter ID Card (EPIC)","purpose":"Proof of identity and eligibility to vote in elections","documents_required":["Proof of Address","Proof of Identity","Passport size photograph","Declaration Form 6"],"process":["Visit the National Voters Service Portal (NVSP)","Fill Form 6 online for new voter registration","Upload age proof, address proof, and photograph","The Booth Level Officer (BLO) will visit your house for verification","After approval, the Voter ID card is printed and posted to your address"],"link":"https://www.nvsp.in/"},
+        {"id":"driving_license","name":"Driving License","purpose":"Official document permitting operation of motor vehicles","documents_required":["Learner License","Address Proof","Age Proof","Form 1 and 1A (Medical Certificate if applicable)","Fee Payment Receipt"],"process":["Apply for a Learner License online on Sarathi Parivahan portal","Take the online learner's test and pass it","After 30 days of Learner License, apply for permanent Driving License online","Book a slot for a driving test at the local RTO office","Appear for the driving test; if you pass, the DL will be dispatched by post"],"link":"https://sarathi.parivahan.gov.in/"},
+        {"id":"ration_card","name":"Ration Card","purpose":"State-issued document for buying subsidized food grains","documents_required":["Aadhaar Cards of all family members","Income Proof","Residency Proof","Passport size photo of head of family"],"process":["Visit the state food and civil supplies portal or local FCS office","Fill the Application Form for new Ration Card","Submit copies of Aadhaar cards and family income proofs","FCS inspectors conduct field verification","Receive ration card from the local fair price shop or download online"],"link":"https://nfsa.gov.in/"},
+        {"id":"birth_certificate","name":"Birth Certificate","purpose":"Primary proof of birth, date, place, and parentage","documents_required":["Discharge certificate from hospital","Aadhaar Card of parents","Marriage certificate of parents (optional)","Identity proof of informant"],"process":["Get a birth registration form from the municipal corporation or Gram Panchayat","Register the birth within 21 days at the local registrar office","Provide hospital discharge summary and parental identity documents","Pay the nominal fee for additional copies of the birth certificate","Collect the certificate from the municipal counter or download online"],"link":"https://crsorgi.gov.in/"},
+        {"id":"caste_certificate","name":"Caste Certificate","purpose":"Official proof of belonging to a reserved category (SC/ST/OBC)","documents_required":["Aadhaar Card","Proof of residency","Father's caste certificate or community proof","Affidavit declaring caste status","Income certificate (for OBC non-creamy layer)"],"process":["Apply online on the state e-District portal or at a local CSC center","Fill the application form and upload scanned copies of proofs","Application is forwarded to local Revenue Inspector / Tehsildar","Tehsildar verifies the caste history through local inquiry","Once approved, download the digitally signed caste certificate"],"link":"https://www.myscheme.gov.in/"},
+        {"id":"domicile_certificate","name":"Domicile Certificate","purpose":"Proof that a person is a resident of a particular State/UT","documents_required":["Aadhaar Card","School leaving certificate showing residency","Land registry papers or rent agreement","Ration card or voter list entry","Affidavit in prescribed format"],"process":["Login to your state's e-District website","Fill the residency / domicile certificate form","Submit proofs showing continuous residency for specified years (usually 5-15 years)","Local revenue authority (Patwari/Lekhpal) conducts verification","Download the issued Domicile Certificate from the portal"],"link":"https://www.myscheme.gov.in/"},
+        {"id":"marriage_certificate","name":"Marriage Certificate","purpose":"Proof of legal registration of marriage","documents_required":["Application form signed by husband and wife","Proof of birth of both parties","Address proof before and after marriage","Two marriage photographs","Wedding invitation card","Witness identity proofs (usually 3 witnesses)"],"process":["File an application online or at the Sub-Registrar's Office (SRO) in your area","Submit marriage invitation card, photos, and age/address proofs","Both partners and witnesses must appear before the Sub-Registrar on the appointed date","Under Hindu Marriage Act, certificate is issued in a few days. Under Special Marriage Act, a 30-day notice is posted","Collect the marriage certificate signed by the Registrar"],"link":"https://www.india.gov.in/"},
+        {"id":"disability_certificate","name":"Disability Certificate (UDID Card)","purpose":"Official identity card for persons with disabilities to claim benefits","documents_required":["Aadhaar Card","Address Proof","Recent passport size photograph","Medical reports showing disability details"],"process":["Register on the Swavlambancard (UDID) portal","Fill the personal, address, and disability details in the online form","Select the government hospital for physical medical assessment","Visit the designated hospital on the scheduled date for medical board checkup","Medical board determines disability percentage, and UDID card is issued online and posted"],"link":"https://www.swavlambancard.gov.in/"},
+        {"id":"death_certificate","name":"Death Certificate","purpose":"Official proof of death of an individual","documents_required":["Hospital death summary or post-mortem report","Aadhaar Card of the deceased","Identity proof of the applicant","Cremation/burial receipt"],"process":["Report the death to the local registrar within 21 days of occurrence","Submit the hospital death report or declaration by local headman","Provide identity proofs of the deceased and applicant","Verify the entry in the death register of the local body","Collect the printed death certificate from municipal or panchayat office"],"link":"https://crsorgi.gov.in/"},
+        {"id":"minority_certificate","name":"Minority Certificate","purpose":"Proof of belonging to a religious/linguistic minority community","documents_required":["Aadhaar Card","Self-declaration of community membership","School leaving certificate","Domicile Certificate","Parents' minority declaration or school record"],"process":["Apply through the State Minorities Commission or e-District portal","Upload self-declaration of religion/linguistic community","Attach address and identity proofs","Revenue officer verifies the credentials","Obtain the digital certificate from the portal dashboard"],"link":"https://www.minorityaffairs.gov.in/"},
+        {"id":"senior_citizen_card","name":"Senior Citizen Card","purpose":"Grants age concessions for travel, healthcare, and utility bills","documents_required":["Proof of Age (PAN Card/Birth Certificate)","Proof of Address","Two passport size photographs","Medical certificate showing blood group"],"process":["Apply through the state Social Welfare Department portal or local municipal office","Fill the senior citizen registration form","Upload age proof (showing age 60 or above) and photo","Verification is done by social welfare officers","Collect the Senior Citizen ID Card which lists blood group, emergency contact, and age benefits"],"link":"https://www.india.gov.in/"},
+        {"id":"pan_card","name":"PAN Card","purpose":"Permanent Account Number for all tax-related financial transactions","documents_required":["Aadhaar Card (serves as identity, address, and date of birth proof)","Recent passport size photographs (for physical forms)","Valid mobile number linked with Aadhaar"],"process":["Visit NSDL (Protean) or UTIITSL website","Fill Form 49A online for Indian Citizens","Choose e-KYC option for instant digital PAN using Aadhaar OTP","Pay application fee of around Rs. 107 online","Physical PAN card will be delivered to your Aadhaar address, and e-PAN is sent to your email"],"link":"https://www.onlineservices.nsdl.com/"},
+        {"id":"aadhaar_card","name":"Aadhaar Card","purpose":"12-digit unique identity number based on biometrics and demographics","documents_required":["Proof of Identity (Passport/Voter ID)","Proof of Address (Utility Bill/Bank statement)","Proof of Date of Birth (Birth Certificate/Marksheet)"],"process":["Locate and book an appointment at the nearest Aadhaar Enrolment Centre","Fill the Aadhaar enrolment form at the center","Provide biometric data (iris scan, fingerprints) and a photograph","Submit copies of identity and address proofs for scanning","Receive an acknowledgment slip with EID; track status online and download e-Aadhaar"],"link":"https://uidai.gov.in/"},
+        {"id":"e_shram_card","name":"e-Shram Card","purpose":"National database of unorganized workers to deliver social security benefits","documents_required":["Aadhaar Card","Aadhaar linked active mobile number","Bank Account details (account number and IFSC code)"],"process":["Visit the e-Shram self-registration portal","Enter your Aadhaar-linked mobile number and solve captcha","Enter Aadhaar details and authenticate using OTP","Fill personal, address, qualification, occupation, and bank details","Verify the details and download the e-Shram card containing a 12-digit UAN number"],"link":"https://eshram.gov.in/"},
+        {"id":"udyam_registration","name":"Udyam (MSME) Registration","purpose":"Official registration for small, micro, and medium enterprises to claim subsidies","documents_required":["Aadhaar Card of the proprietor/partner/director","PAN Card of the organization","GSTIN (if applicable)","Bank Account number and IFSC code"],"process":["Visit the Udyam Registration portal","Enter Aadhaar number and name of entrepreneur, validate with OTP","Enter PAN card details and validate tax status","Provide business name, location, bank details, and investment figures","Submit and receive the Udyam Registration Certificate containing QR code instantly"],"link":"https://udyamregistration.gov.in/"},
+        {"id":"income_certificate","name":"Income Certificate","purpose":"Proof of annual income of a family for fee concessions and scholarships","documents_required":["Aadhaar Card","Salary slip or Form 16 (for salaried)","Affidavit declaring non-salaried income","Ration card or electricity bill","Land records (for farmers)"],"process":["Access the state e-District portal","Complete registration and fill the Income Certificate application form","Upload income declaration affidavit and supporting address proofs","Application undergoes review by the local revenue inspector","Download the digital certificate after approval from the Tehsildar"],"link":"https://www.myscheme.gov.in/"},
+        {"id":"land_possession","name":"Land Possession Certificate (LPC)","purpose":"Establishes legal possession over a piece of land","documents_required":["Registered land deed papers","Recent land tax payment receipt","Aadhaar Card","Voter List copy","Affidavit declaring land details"],"process":["Apply online on the state Land Records (Bhumi) portal or visit Circle Office","Fill application form with Khata/Khesra/Plot numbers","Submit copies of registered deeds and current revenue tax receipt","An Amin (surveyor) is deputed to measure and verify boundary possession","Circle Officer approves and issues LPC showing ownership details"],"link":"https://www.myscheme.gov.in/"},
+        {"id":"ration_card_surrender","name":"Ration Card Surrender Certificate","purpose":"Required when moving to another state or changing category","documents_required":["Active Ration Card","Aadhaar Card","Proof of transfer/relocation","Application form for surrender"],"process":["Submit application to District Supply Officer (DSO) or apply online","Provide active ration card details and reason for surrender","FCS department marks the card as inactive and generates surrender slip","Use this surrender slip to apply for a fresh ration card in your new location"],"link":"https://nfsa.gov.in/"},
+        {"id":"non_creamy_layer","name":"OBC Non-Creamy Layer Certificate","purpose":"Required to claim reservation benefits in education and government jobs","documents_required":["Community/Caste Certificate","Aadhaar Card","Parent's Income Certificates / Form 16 for last 3 years","Affidavit declaring assets and income"],"process":["Apply through the e-District website or Citizen Service Centre","Submit caste proof and parents' verified income details of the past three fiscal years","Revenue inspectors verify that family income is below the creamy layer threshold (currently Rs. 8 Lakh/year)","Tehsildar issues the NCL certificate, usually valid for one financial year"],"link":"https://www.myscheme.gov.in/"}
+      ],
+      faqs: [
+        {"id":11,"question":"How can I check the status of my Aadhaar card update?","answer":"You can check your Aadhaar status online by visiting the UIDAI MyAadhaar portal and entering your 14-digit Enrolment ID (EID) along with the date and time from the acknowledgment slip.","category":"Aadhaar"},
+        {"id":12,"question":"What is the difference between a PAN card and an e-PAN?","answer":"A physical PAN card is a plastic card sent by post, whereas an e-PAN is a digitally signed PAN card issued in electronic format. Both are equally valid for all financial and tax transactions.","category":"PAN"},
+        {"id":13,"question":"How do I link my mobile number to my bank account for DBT?","answer":"Visit your bank branch with your Aadhaar card and passbook, fill out the DBT enablement/Aadhaar seeding form, and submit it. Some banks also allow this via net banking or ATMs.","category":"Banking"},
+        {"id":14,"question":"What should I do if my debit card is lost or stolen?","answer":"Immediately call your bank's customer care helpline to block the card, or block it instantly using your mobile banking application or internet banking portal to prevent unauthorized transactions.","category":"Banking"},
+        {"id":15,"question":"How do I report a cybercrime or online financial fraud?","answer":"You can file a complaint online at the National Cyber Crime Reporting Portal (cybercrime.gov.in) or call the national cybercrime helpline number 1930 immediately.","category":"Cyber Safety"},
+        {"id":16,"question":"Can a student apply for multiple scholarships on the National Scholarship Portal?","answer":"While you can search and submit applications for multiple scholarships on NSP, you are generally eligible to receive only one scholarship per academic year, depending on the scheme terms.","category":"Education"},
+        {"id":17,"question":"Is my digital document in DigiLocker legally valid?","answer":"Yes, documents issued in DigiLocker are legally recognized on par with original physical documents under Rule 9A of the Information Technology (Preservation and Retention of Information by Intermediaries Providing Digital Locker Facilities) Rules, 2016.","category":"DigiLocker"},
+        {"id":18,"question":"What is PM Kisan e-KYC and is it mandatory?","answer":"Yes, e-KYC is mandatory for all PM Kisan beneficiaries to receive their financial benefits. You can complete it using OTP on the PM-Kisan portal or through biometrics at a nearby CSC center.","category":"Agriculture"},
+        {"id":19,"question":"How do I apply for a duplicate Voter ID card if my original is lost?","answer":"You can apply for a replacement Voter ID online on the Voter Service Portal (voters.eci.gov.in) by filling Form 8 and selecting the replacement category. A nominal fee or process may apply.","category":"Voter ID"},
+        {"id":20,"question":"What is the maximum income limit for getting an OBC Non-Creamy Layer certificate?","answer":"Currently, the family income threshold for the OBC Non-Creamy Layer status is Rs. 8 Lakh per annum. This excludes salary and agricultural income in certain cases.","category":"Certificates"},
+        {"id":21,"question":"How can I register my business under MSME?","answer":"You can register your enterprise free of cost on the official Udyam Registration portal (udyamregistration.gov.in). You only need your Aadhaar card, PAN, and basic business details.","category":"Business"},
+        {"id":22,"question":"How do I know if my ration card is active?","answer":"You can check your ration card status on your state's Food and Civil Supplies Department portal by entering your Ration Card number, or via the Mera Ration mobile application.","category":"Ration"},
+        {"id":23,"question":"What is the validity period of an Income Certificate?","answer":"The validity of an Income Certificate depends on state rules, but it is typically valid for one financial year from its date of issue.","category":"Certificates"},
+        {"id":24,"question":"What is the KIRAN helpline?","answer":"KIRAN (1800-599-0019) is a free, 24/7 national helpline launched by the government to provide mental health support, counseling, and crisis management.","category":"Helpline"},
+        {"id":25,"question":"Who should I contact if a government official demands a bribe?","answer":"You can report corruption or bribe demands to the State Anti-Corruption Bureau (ACB) or the Vigilance Department. You can also file a complaint with the Central Vigilance Commission (CVC) online.","category":"Governance"},
+        {"id":26,"question":"How do I apply for a Senior Citizen Card?","answer":"You can apply through your state's e-District portal or local social welfare department. You will need proof of age (showing 60+ years), address proof, and photographs.","category":"Certificates"},
+        {"id":27,"question":"What is the PM SVANidhi scheme?","answer":"PM SVANidhi is a micro-credit scheme that provides working capital loans of up to Rs. 10,000 (with subsequent higher tranches) to street vendors to restart their businesses.","category":"Business"},
+        {"id":28,"question":"Can I track my speed post passport delivery online?","answer":"Yes, once your passport is dispatched, you will receive a tracking number via SMS. You can track its location on the India Post tracking website (indiapost.gov.in).","category":"Passport"},
+        {"id":29,"question":"How do I update my address on my Driving License?","answer":"You can apply for a 'Change of Address' on the Sarathi Parivahan portal. You will need to upload your current DL and valid address proof, pay the fee, and submit.","category":"Driving License"},
+        {"id":30,"question":"What is an e-Shram card and who is eligible?","answer":"The e-Shram card is for unorganized workers (like laborers, construction workers, street vendors, domestic help) aged 16-59. It helps them receive social security schemes directly.","category":"Social Security"}
+      ],
+      helplines: [
+        {"id":11,"name":"National Cyber Crime Helpline","number":"1930","category":"Cyber Safety","availability":"24x7","link":"https://cybercrime.gov.in/"},
+        {"id":12,"name":"Emergency Response Support System (ERSS)","number":"112","category":"Emergency Services","availability":"24x7","link":"https://112.gov.in/"},
+        {"id":13,"name":"Women Helpline","number":"1091","category":"Women Safety","availability":"24x7","link":"https://www.india.gov.in/"},
+        {"id":14,"name":"Child Helpline","number":"1098","category":"Child Welfare","availability":"24x7","link":"https://www.childlineindia.org.in/"},
+        {"id":15,"name":"National Consumer Helpline","number":"1915","category":"Consumer Protection","availability":"24x7","link":"https://consumerhelpline.gov.in/"},
+        {"id":16,"name":"Kisan Call Centre (Farmer Helpline)","number":"1800-180-1551","category":"Agriculture","availability":"6 AM to 10 PM","link":"https://agricoop.nic.in/"},
+        {"id":17,"name":"KIRAN Mental Health Helpline","number":"1800-599-0019","category":"Healthcare","availability":"24x7","link":"https://socialjustice.gov.in/"},
+        {"id":18,"name":"Senior Citizen National Helpline (Elderline)","number":"14567","category":"Senior Citizens","availability":"8 AM to 8 PM","link":"https://socialjustice.gov.in/"},
+        {"id":19,"name":"National Highway Helpline","number":"1033","category":"Road Safety","availability":"24x7","link":"https://nhai.gov.in/"},
+        {"id":20,"name":"Railway Inquiry Helpline","number":"139","category":"Travel Services","availability":"24x7","link":"https://enquiry.indianrail.gov.in/"},
+        {"id":21,"name":"LPG Leakage Emergency Helpline","number":"1906","category":"Emergency Services","availability":"24x7","link":"https://www.mylpg.in/"},
+        {"id":22,"name":"Disaster Management Helpline","number":"1078","category":"Emergency Services","availability":"24x7","link":"https://ndma.gov.in/"},
+        {"id":23,"name":"AIDS Helpline (NACO)","number":"1097","category":"Healthcare","availability":"24x7","link":"http://naco.gov.in/"},
+        {"id":24,"name":"Anti-Ragging Helpline","number":"1800-180-5522","category":"Education","availability":"24x7","link":"https://www.antiragging.in/"},
+        {"id":25,"name":"National Tourist Helpline","number":"1363","category":"Travel Services","availability":"24x7","link":"https://www.tourism.gov.in/"},
+        {"id":26,"name":"Central Vigilance Commission (Anti-Corruption)","number":"1960","category":"Governance","availability":"Office Hours","link":"https://cvc.gov.in/"},
+        {"id":27,"name":"Income Tax Helpline","number":"1800-180-1961","category":"Financial Services","availability":"8 AM to 10 PM","link":"https://www.incometax.gov.in/"},
+        {"id":28,"name":"UIDAI Aadhaar Helpline","number":"1947","category":"Identity Services","availability":"24x7","link":"https://uidai.gov.in/"},
+        {"id":29,"name":"Elections Helpline","number":"1950","category":"Governance","availability":"Office Hours","link":"https://eci.gov.in/"},
+        {"id":30,"name":"Blood Bank Helpline","number":"104","category":"Healthcare","availability":"24x7","link":"https://www.redcross.org/"}
+      ],
+      government_links: [
+        {"id":11,"title":"National Portal of India","category":"General Directory","url":"https://www.india.gov.in/","description":"The single window access to information and services provided by various Indian government entities."},
+        {"id":12,"title":"myScheme Portal","category":"Scheme Discovery","url":"https://www.myscheme.gov.in/","description":"A platform that helps citizens discover eligible government schemes based on their demographics."},
+        {"id":13,"title":"UIDAI Official Portal","category":"Identity Services","url":"https://uidai.gov.in/","description":"Official website for Aadhaar card enrollment, updates, status checks, and e-download."},
+        {"id":14,"title":"DigiLocker","category":"Document Wallet","url":"https://www.digilocker.gov.in/","description":"A cloud-based platform for issuance and verification of documents & certificates digitally."},
+        {"id":15,"title":"National Scholarship Portal","category":"Education","url":"https://scholarships.gov.in/","description":"One-stop solution for student scholarships from central ministries and state governments."},
+        {"id":16,"title":"PM Kisan Portal","category":"Agriculture","url":"https://pmkisan.gov.in/","description":"Official portal for landholding farmers to check eligibility, register, and check installment status."},
+        {"id":17,"title":"Passport Seva Kendra","category":"Travel Services","url":"https://www.passportindia.gov.in/","description":"Online registration and appointment booking for obtaining or renewing Indian passports."},
+        {"id":18,"title":"Income Tax Department","category":"Tax Services","url":"https://www.incometax.gov.in/","description":"Official e-filing portal for income tax returns, PAN links, and tax calculations."},
+        {"id":19,"title":"National Cyber Crime Reporting Portal","category":"Cyber Safety","url":"https://cybercrime.gov.in/","description":"A portal for citizens to report cybercrimes online, especially crimes targeting women and children."},
+        {"id":20,"title":"UMANG Web Portal","category":"Citizen Services","url":"https://web.umang.gov.in/","description":"Unified Mobile Application for New-age Governance, offering access to 1200+ services."},
+        {"id":21,"title":"Sarathi Parivahan (RTO)","category":"Transport Services","url":"https://sarathi.parivahan.gov.in/","description":"Ministry of Road Transport website for applying for Driving Licenses and Learner Licenses."},
+        {"id":22,"title":"Udyam Registration Portal","category":"Business Services","url":"https://udyamregistration.gov.in/","description":"Official portal for registering micro, small, and medium enterprises (MSMEs) under MSME Ministry."},
+        {"id":23,"title":"National Consumer Helpline","category":"Consumer Protection","url":"https://consumerhelpline.gov.in/","description":"A grievance redressal portal where consumers can file complaints against businesses or services."},
+        {"id":24,"title":"National Career Service","category":"Employment Services","url":"https://www.ncs.gov.in/","description":"A portal matching job-seekers with employers, training institutes, and career counselors."},
+        {"id":25,"title":"e-Shram Portal","category":"Social Security","url":"https://eshram.gov.in/","description":"National database of unorganized workers to facilitate social welfare schemes delivery."},
+        {"id":26,"title":"Startup India","category":"Business Services","url":"https://www.startupindia.gov.in/","description":"A flagship initiative of the Government of India to build a strong ecosystem for nurturing innovation."},
+        {"id":27,"title":"PM MUDRA Yojana Portal","category":"Business Loans","url":"https://www.mudra.org.in/","description":"Official portal describing collateral-free loans up to 10 Lakhs for micro-enterprises."},
+        {"id":28,"title":"Central Vigilance Commission","category":"Governance","url":"https://cvc.gov.in/","description":"An apex government body to address corruption and promote integrity in public administration."},
+        {"id":29,"title":"Voter Service Portal (ECI)","category":"Governance","url":"https://voters.eci.gov.in/","description":"Official portal of the Election Commission of India for voter registration and updates."},
+        {"id":30,"title":"Swachh Bharat Mission Portal","category":"Sanitation","url":"https://swachhbharatmission.ddws.gov.in/","description":"Official portal detailing sanitation, waste management schemes, and household toilet subsidies."}
+      ],
+      government_updates: [
+        {"id":11,"title":"Advisory on Part-time Job Scams","category":"Advisory","summary":"Ministry of Home Affairs warns citizens against online part-time job offers via WhatsApp/Telegram that ask for investments.","date":"2026-06-01","link":"https://cybercrime.gov.in/"},
+        {"id":12,"title":"PAN-Aadhaar Linking Deadline Extended","category":"Notification","summary":"The Central Board of Direct Taxes (CBDT) has extended the deadline for linking PAN with Aadhaar card to prevent PAN deactivation.","date":"2026-06-02","link":"https://www.incometax.gov.in/"},
+        {"id":13,"title":"Launch of PM Vishwakarma Scheme Portal","category":"New Scheme","summary":"Prime Minister launches the new portal for PM Vishwakarma, allowing traditional artisans to register and claim incentives.","date":"2026-06-03","link":"https://pmvishwakarma.gov.in/"},
+        {"id":14,"title":"Alert: Fake Electricity Bill SMS","category":"Advisory","summary":"Power grid companies warn consumers not to click links in messages claiming their electricity will be disconnected.","date":"2026-06-04","link":"https://cybercrime.gov.in/"},
+        {"id":15,"title":"NSP Open for Fresh Registrations","category":"Scholarships","summary":"National Scholarship Portal is now open for pre-matric and post-matric applications for the academic year 2026-27.","date":"2026-06-05","link":"https://scholarships.gov.in/"},
+        {"id":16,"title":"Mandatory e-KYC for PM Kisan Beneficiaries","category":"Notification","summary":"Department of Agriculture reminds all registered landholders to complete biometric or OTP e-KYC before the next payout.","date":"2026-06-06","link":"https://pmkisan.gov.in/"},
+        {"id":17,"title":"New Guidelines for DigiLocker Accounts","category":"Notification","summary":"DigiLocker enhances user security by introducing six-digit PIN and two-factor authentication for government document access.","date":"2026-06-07","link":"https://www.digilocker.gov.in/"},
+        {"id":18,"title":"Digital India Internship Applications Open","category":"Careers","summary":"Ministry of Electronics & IT invites applications for the summer batch of Digital India Internship Scheme from tech graduates.","date":"2026-06-08","link":"https://www.meity.gov.in/"},
+        {"id":19,"title":"Advisory: Do Not Share OTP for Courier Delivery","category":"Advisory","summary":"Police departments caution citizens against OTP sharing with delivery agents demanding fees for unexpected packages.","date":"2026-06-09","link":"https://cybercrime.gov.in/"},
+        {"id":20,"title":"PM Awas Yojana Gramin Direct Benefit Transfer","category":"Notification","summary":"First installment of house building subsidy transferred directly to over 50,000 rural beneficiaries under PMAY-G.","date":"2026-06-10","link":"https://pmayg.nic.in/"},
+        {"id":21,"title":"UDID Card Registration Drives in Rural Districts","category":"Social Welfare","summary":"Ministry of Social Justice organizes block-level camps to identify and register specially-abled citizens for UDID cards.","date":"2026-06-10","link":"https://www.swavlambancard.gov.in/"},
+        {"id":22,"title":"Udyam MSME Registration Reaches Milestone","category":"Announcement","summary":"Ministry of MSME announces that active Udyam registrations have crossed 2 Crore, enabling small businesses to access credit.","date":"2026-06-10","link":"https://udyamregistration.gov.in/"},
+        {"id":23,"title":"Advisory against Fake Government Websites","category":"Advisory","summary":"National Informatics NIC publishes a guide on identifying fake websites mimicking official government domains.","date":"2026-06-10","link":"https://www.india.gov.in/"},
+        {"id":24,"title":"Unified Highway Helpline 1033 Operational","category":"Services","summary":"NHAI announces nationwide activation of 1033 helpline for emergency support and towing services on national highways.","date":"2026-06-10","link":"https://nhai.gov.in/"},
+        {"id":25,"title":"Free Soil Testing Scheme for Farmers","category":"Agriculture","summary":"Krishi Vigyan Kendras organize free soil testing campaigns to help farmers optimize fertilizer application for kharif crops.","date":"2026-06-10","link":"https://pmkisan.gov.in/"},
+        {"id":26,"title":"Central Consumer Protection Authority Advisory","category":"Advisory","summary":"CCPA issues guidelines to prevent unfair trade practices and misleading advertisements on e-commerce platforms.","date":"2026-06-10","link":"https://consumerhelpline.gov.in/"},
+        {"id":27,"title":"E-Shram Portal Integrates with NCS","category":"Notification","summary":"Workers registered on e-Shram can now search and apply for jobs on the National Career Service portal with one click.","date":"2026-06-10","link":"https://eshram.gov.in/"},
+        {"id":28,"title":"Railway Security App Features Upgraded","category":"Services","summary":"Indian Railways upgrades the safety app with direct video-calling to local RPF assistance booths for female passengers.","date":"2026-06-10","link":"https://enquiry.indianrail.gov.in/"},
+        {"id":29,"title":"Special Ayushman Card Campaign in Urban Slums","category":"Healthcare","summary":"Municipal corporations launch a 15-day drive to register daily-wage workers for the PM-JAY health insurance scheme.","date":"2026-06-10","link":"https://beneficiary.nha.gov.in/"},
+        {"id":30,"title":"Consumer Grievance Redressal Fortnight","category":"Announcement","summary":"National Consumer Helpline organizes a fortnight dedicated to resolving pending service provider complaints.","date":"2026-06-10","link":"https://consumerhelpline.gov.in/"}
+      ],
+      awareness_content: [
+        {"id":11,"type":"scam","title":"Electricity Bill Disconnection Scam","warning":"Receiving text messages warning that electricity will be cut off tonight unless you call a specific mobile number or download an app.","action":"Do not call the number. Contact the official electricity board helpline directly or check your bill on the official board website."},
+        {"id":12,"type":"scam","title":"Fake Customer Care Toll-Free Numbers","warning":"Searching for customer care numbers on search engines can lead to fake numbers posted by scammers mimicking banks/airlines.","action":"Only use customer care numbers found on official mobile apps, or printed on the back of your credit/debit cards."},
+        {"id":13,"type":"scam","title":"Part-Time Job / Telegram Task Scams","warning":"Promises of earning thousands daily by doing simple tasks like liking videos, followed by demands to join investment groups.","action":"Never transfer money to get high-paying simple tasks. Report such groups on the social app and cybercrime portal."},
+        {"id":14,"type":"scam","title":"Kaun Banega Crorepari WhatsApp Lottery","warning":"Receiving audio messages and posters claiming you have won a lottery of Rs. 25 Lakh, requesting processing fees.","action":"This is a 100% fake lottery scam. Do not pay any 'processing fee' or tax, and block the unknown number immediately."},
+        {"id":15,"type":"scam","title":"Courier Delivery Fraud (FedEx Scam)","warning":"Scammers call claiming a parcel sent by you contains illegal substances, demanding payment or bank details to avoid arrest.","action":"No law agency or courier service demands online payment over a call to clear cases. Hang up and report immediately to 1930."},
+        {"id":16,"type":"scam","title":"Remote Device Access App Scam","warning":"Scammers ask you to download apps like AnyDesk, TeamViewer, or RustDesk under the pretext of resolving a tech support problem.","action":"Downloading these apps gives complete control of your screen and OTPs to the scammer. Never install remote access apps for strangers."},
+        {"id":17,"type":"scam","title":"Aadhaar Enabled Payment System (AePS) Fraud","warning":"Biometric fingerprints copied from property papers or registry documents can be misused to withdraw money via AePS.","action":"Lock your biometrics using the UIDAI portal or mAadhaar app. Unlock them temporarily only when you need to authenticate."},
+        {"id":18,"type":"scam","title":"Fake Government Subsidy Links","warning":"Messages on WhatsApp claiming government is distributing free laptops, tablets, or solar panels if you click a link and forward it.","action":"Check the URL domain. Government websites always end in .gov.in or .nic.in. Do not forward such unverified viral links."},
+        {"id":19,"type":"scam","title":"Urgent UPI Request Scam","warning":"Scammers send UPI collect requests or QR codes, claiming that scanning the code will deposit money into your account.","action":"You NEVER need to enter your UPI PIN or scan a QR code to receive money. Entering your PIN always deducts money from your account."},
+        {"id":20,"type":"scam","title":"Sextortion and Video Call Blackmail","warning":"Receiving video calls from unknown numbers, which are recorded with obscene footage and used to blackmail you for money.","action":"Do not pick up video calls from unknown numbers. If trapped, do not pay money. File a complaint immediately with the cyber police."},
+        {"id":21,"type":"awareness","title":"Always check Website URLs","warning":"Scam sites use look-alike domain names such as 'pm-kisan-portal.in' instead of the official 'pmkisan.gov.in'.","action":"Always ensure the website domain ends with '.gov.in' or '.nic.in' before submitting personal or banking data."},
+        {"id":22,"type":"awareness","title":"Protect your OTP and PINs","warning":"No official, bank clerk, or helpline agent is authorized to ask for your bank OTP, PIN, password, or CVV.","action":"Keep OTPs confidential. If anyone asks for it, treat them as a potential scammer and end the communication."},
+        {"id":23,"type":"awareness","title":"Secure your Social Media Accounts","warning":"Compromised social media accounts are used by hackers to send urgent borrowing requests to your friends.","action":"Enable Two-Factor Authentication (2FA) on WhatsApp, Facebook, and Instagram to prevent account hijacking."},
+        {"id":24,"type":"awareness","title":"Use DigiLocker for Safety","warning":"Carrying physical certificates can lead to theft, damage, or loss of critical citizenship proofs.","action":"Download and sign up on DigiLocker to store and present digital, legally valid copies of driving licenses, marksheets, and Aadhaar."},
+        {"id":25,"type":"awareness","title":"Block Spam Calls via Sanchar Saathi","warning":"Spam calls and fake SIM cards registered in your name can expose you to legal risks.","action":"Visit the Sanchar Saathi portal (sancharsaathi.gov.in) to check the number of active SIMs linked to your Aadhaar card."},
+        {"id":26,"type":"awareness","title":"Keep Device Software Updated","warning":"Outdated operating systems and applications have security vulnerabilities that hackers can exploit.","action":"Turn on automatic updates on your mobile phones and computers to ensure you have the latest security patches."},
+        {"id":27,"type":"awareness","title":"Verify Charity / Donation Appeals","warning":"Scammers set up fake crowd-funding campaigns and UPI QR codes during disasters to siphon funds.","action":"Donate only to recognized national funds (like PM CARES) or certified, verified NGOs after confirming their credentials."},
+        {"id":28,"type":"awareness","title":"Avoid Public Wi-Fi for Banking","warning":"Public open Wi-Fi networks at banking or cafes can be intercepted to capture usernames and passwords.","action":"Use your private mobile data connection or a secure VPN when logging into net banking or mobile wallets."},
+        {"id":29,"type":"awareness","title":"Report Lost Mobile Phones Immediately","warning":"Lost phones with active SIMs allow thieves to reset passwords and access bank accounts via OTPs.","action":"Contact your telecom provider to block the SIM immediately, and register the lost device on the CEIR portal."},
+        {"id":30,"type":"awareness","title":"Educate Family Members on Scams","warning":"Elderly parents and young teenagers are often the softest targets for online scammers.","action":"Discuss common scam tactics at home and teach them never to share card details or make urgent financial decisions under pressure."}
+      ],
+      feedback: [
+        {"id":11,"name":"Aarav Mehta","email":"aarav.mehta@gmail.com","category":"General","message":"This portal is extremely helpful! I found all information regarding scholarships easily.","rating":5,"language":"en"},
+        {"id":12,"name":"Sunita Devi","email":"sunita.d@yahoo.com","category":"Suggestion","message":"Please translate the schemes descriptions into Hindi and regional languages as well.","rating":4,"language":"hi"},
+        {"id":13,"name":"Rajesh Kumar","email":"rajesh.agri@rediffmail.com","category":"Bug","message":"The PM-Kisan portal link leads to a 404 page. Please check and correct the URL.","rating":3,"language":"en"},
+        {"id":14,"name":"Priya Sharma","email":"priya.sharma99@gmail.com","category":"General","message":"Very clean user interface. The chatbot feature is excellent and answered all my queries immediately.","rating":5,"language":"en"},
+        {"id":15,"name":"Vijay Chawla","email":"vijay_chawla@outlook.com","category":"Suggestion","message":"An option to download the scheme application steps as a PDF would be very helpful.","rating":4,"language":"en"},
+        {"id":16,"name":"Anjali Gupta","email":"anjali.g@gmail.com","category":"General","message":"The scam alert section is really eye-opening. Learned about juice-jacking today.","rating":5,"language":"en"},
+        {"id":17,"name":"Amit Patel","email":"amit.patel@hotmail.com","category":"Bug","message":"The page load speed is slow when loading the complete helpline list on mobile.","rating":3,"language":"en"},
+        {"id":18,"name":"Ramesh Naik","email":"ramesh.naik@gmail.com","category":"General","message":"Good job putting all government helplines in one place. Saves a lot of time.","rating":5,"language":"en"},
+        {"id":19,"name":"Kiran Rao","email":"kiran.rao@gmail.com","category":"Suggestion","message":"Would love to see state-specific schemes for Karnataka added to the portal.","rating":4,"language":"en"},
+        {"id":20,"name":"Meena Swaminathan","email":"meena.s@gmail.com","category":"General","message":"The site is very easy to navigate even for elderly people like me. Thank you.","rating":5,"language":"en"},
+        {"id":21,"name":"Vikram Malhotra","email":"vikram.m@gmail.com","category":"Suggestion","message":"Please add a dark mode toggle to the dashboard to make it easier to read at night.","rating":4,"language":"en"},
+        {"id":22,"name":"Deepika Padukone","email":"deepika.p@gmail.com","category":"General","message":"Great initiative! It helped my domestic helper apply for her e-Shram card.","rating":5,"language":"en"},
+        {"id":23,"name":"Suresh Prabhu","email":"suresh.p@gmail.com","category":"Bug","message":"The search bar doesn't filter schemes properly when capital letters are used.","rating":3,"language":"en"},
+        {"id":24,"name":"Harish Iyer","email":"harish.iyer@gmail.com","category":"General","message":"A very clean and secure site. Highly recommend it to everyone looking for schemes.","rating":5,"language":"en"},
+        {"id":25,"name":"Nisha Patel","email":"nisha.p@gmail.com","category":"Suggestion","message":"Add an alert system to email subscribers when new schemes are launched.","rating":4,"language":"en"},
+        {"id":26,"name":"Gopal Sharma","email":"gopal.s@gmail.com","category":"General","message":"The helpline numbers are up to date. Tried the cyber fraud line and it worked.","rating":5,"language":"en"},
+        {"id":27,"name":"Ramanathan Iyer","email":"ram.iyer@gmail.com","category":"Bug","message":"FAQ dropdown is overlapping with the footer on smaller screen sizes.","rating":3,"language":"en"},
+        {"id":28,"name":"Sita Ram","email":"sita.ram@gmail.com","category":"General","message":"We need more awareness portals like this. Simple language makes it accessible.","rating":5,"language":"hi"},
+        {"id":29,"name":"Karan Johar","email":"karan.j@gmail.com","category":"Suggestion","message":"Highlighting top trending schemes on the home page would improve discovery.","rating":4,"language":"en"},
+        {"id":30,"name":"Lata Mangeshkar","email":"lata.m@gmail.com","category":"General","message":"Wonderful portal. Extremely helpful for rural citizens with poor access to offices.","rating":5,"language":"hi"}
+      ]
+    };
+
+    const tables = [
+      { id: 'schemes', name: 'Schemes', pk: 'id' },
+      { id: 'documents', name: 'Documents', pk: 'id' },
+      { id: 'faqs', name: 'FAQs', pk: 'id' },
+      { id: 'helplines', name: 'Helplines', pk: 'id' },
+      { id: 'government_links', name: 'Gov Links', pk: 'id' },
+      { id: 'government_updates', name: 'Gov Updates', pk: 'id' },
+      { id: 'awareness_content', name: 'Awareness Content', pk: 'id' },
+      { id: 'feedback', name: 'Feedback', pk: 'id' }
+    ];
+
+    const consoleEl = document.getElementById('console');
+    const startBtn = document.getElementById('start-btn');
+    const statusContainer = document.getElementById('status-container');
+
+    function log(message, type = 'info') {
+      const line = document.createElement('div');
+      line.className = `log-line log-${type}`;
+      line.textContent = `> ${message}`;
+      consoleEl.appendChild(line);
+      consoleEl.scrollTop = consoleEl.scrollHeight;
+    }
+
+    // Render Table cards
+    tables.forEach(t => {
+      const card = document.createElement('div');
+      card.className = 'table-card';
+      card.id = `card-${t.id}`;
+      card.innerHTML = `
+        <span class="table-name">${t.name}</span>
+        <span class="table-badge badge-pending" id="badge-${t.id}">Pending</span>
+      `;
+      statusContainer.appendChild(card);
+    });
+
+    startBtn.addEventListener('click', async () => {
+      startBtn.disabled = true;
+      const url = document.getElementById('sb-url').value.trim();
+      const key = document.getElementById('sb-key').value.trim();
+
+      if (!url || !key) {
+        log('Error: Supabase URL and Key are required.', 'error');
+        startBtn.disabled = false;
+        return;
+      }
+
+      log('Connecting to Supabase...', 'info');
+      let supabase;
+      try {
+        supabase = supabase.createClient(url, key);
+        log('Supabase client initialized.', 'success');
+      } catch (e) {
+        log(`Failed to initialize Supabase client: ${e.message}`, 'error');
+        startBtn.disabled = false;
+        return;
+      }
+
+      for (const t of tables) {
+        const card = document.getElementById(`card-${t.id}`);
+        const badge = document.getElementById(`badge-${t.id}`);
+        
+        card.className = 'table-card active';
+        badge.className = 'table-badge badge-running';
+        badge.textContent = 'Running';
+
+        log(`Starting import for table '${t.id}'...`, 'info');
+        const dataToInsert = dataset[t.id];
+
+        try {
+          const { error } = await supabase
+            .from(t.id)
+            .upsert(dataToInsert, { onConflict: t.pk });
+
+          if (error) {
+            log(`Failed to upsert to '${t.id}': ${error.message} (${error.details || 'No details'})`, 'error');
+            card.className = 'table-card error';
+            badge.className = 'table-badge badge-error';
+            badge.textContent = 'Error';
+          } else {
+            log(`Successfully imported ${dataToInsert.length} records into table '${t.id}'!`, 'success');
+            card.className = 'table-card success';
+            badge.className = 'table-badge badge-success';
+            badge.textContent = 'Success';
+          }
+        } catch (e) {
+          log(`Exception importing table '${t.id}': ${e.message}`, 'error');
+          card.className = 'table-card error';
+          badge.className = 'table-badge badge-error';
+          badge.textContent = 'Error';
+        }
+      }
+
+      log('Import process finished.', 'info');
+      startBtn.disabled = false;
+    });
+  </script>
+</body>
+</html>
