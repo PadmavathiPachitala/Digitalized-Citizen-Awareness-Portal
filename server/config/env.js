@@ -21,7 +21,7 @@ export const config = {
   geminiModel: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
   corsOrigins: toList(process.env.CORS_ORIGINS, ['http://localhost:3000', 'http://127.0.0.1:3000']),
   rateLimitWindowMs: toNumber(process.env.RATE_LIMIT_WINDOW_MS, 15 * 60 * 1000),
-  rateLimitMax: toNumber(process.env.RATE_LIMIT_MAX, 120)
+  rateLimitMax: toNumber(process.env.RATE_LIMIT_MAX, 1000)
 };
 
 export const isProduction = config.nodeEnv === 'production';

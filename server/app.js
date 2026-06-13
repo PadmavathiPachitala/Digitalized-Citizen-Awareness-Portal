@@ -25,7 +25,7 @@ const PROJECT_ROOT = path.resolve(__dirname, '..');
 const app = express();
 
 // Trust Render's reverse proxy so rate limiting works per-user, not globally
-app.set('trust proxy', 1);
+app.set('trust proxy', true);
 
 app.use(securityHeaders);
 app.use(corsMiddleware);
