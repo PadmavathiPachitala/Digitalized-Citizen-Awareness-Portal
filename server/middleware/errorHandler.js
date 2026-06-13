@@ -2,7 +2,13 @@ import { logger } from '../utils/logger.js';
 
 export const notFoundHandler = (req, res) => {
   if (req.accepts('html') && !req.path.startsWith('/api/')) {
-    return res.sendFile(req.app.locals.indexFile);
+    return res.status(404).send(`
+      <div style="text-align: center; padding: 50px; font-family: sans-serif;">
+        <h2>404 - Page Not Found</h2>
+        <p>The page you are looking for does not exist or the link is incorrect.</p>
+        <a href="/" style="color: #FF6B00; text-decoration: none; font-weight: bold;">Return to Home</a>
+      </div>
+    `);
   }
 
   return res.status(404).json({ ok: false, error: 'Not found' });
