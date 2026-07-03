@@ -184,14 +184,9 @@ app.post('/api/assistant', asyncHandler(async (req, res) => {
     if (!geminiRes.ok) {
       const errorText = await geminiRes.text();
       console.warn(`Gemini API returned error status ${geminiRes.status}:`, errorText);
-      let parsedError = errorText;
-      try {
-        const parsed = JSON.parse(errorText);
-        parsedError = parsed.error?.message || errorText;
-      } catch (e) {}
       const fallbackReply = await fallback();
       return res.json({ 
-        reply: `[Gemini API Error ${geminiRes.status}: ${parsedError}]. Fallback: ${fallbackReply}`, 
+        reply: fallbackReply, 
         source: 'fallback', 
         matches 
       });
@@ -203,7 +198,7 @@ app.post('/api/assistant', asyncHandler(async (req, res) => {
       console.warn("Gemini API error payload:", data.error);
       const fallbackReply = await fallback();
       return res.json({ 
-        reply: `[Gemini API Error: ${data.error.message || JSON.stringify(data.error)}]. Fallback: ${fallbackReply}`, 
+        reply: fallbackReply, 
         source: 'fallback', 
         matches 
       });
@@ -216,7 +211,7 @@ app.post('/api/assistant', asyncHandler(async (req, res) => {
     console.error("Gemini API call failed with exception:", error);
     const fallbackReply = await fallback();
     res.json({ 
-      reply: `[Gemini Exception: ${error.message}]. Fallback: ${fallbackReply}`, 
+      reply: fallbackReply, 
       source: 'fallback', 
       matches 
     });
