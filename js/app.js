@@ -623,10 +623,70 @@ const keywordReplies = [
   { keywords: ["eligibility", "eligible", "income"], text: "Eligibility depends on age, income, residence, category, occupation, and official scheme rules. Try the eligibility page for a quick guide." }
 ];
 
+function parseMarkdown(text) {
+  if (!text) return "";
+  
+  // Escape HTML to prevent XSS
+  let html = text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+  // Bold: **text** -> <strong>text</strong>
+  html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+
+  // Italic: *text* or _text_ -> <em>text</em>
+  html = html.replace(/\*(.*?)\*/g, "<em>$1</em>");
+  html = html.replace(/_(.*?)_/g, "<em>$1</em>");
+
+  // Headers: ### text -> <h3>text</h3>
+  html = html.replace(/^### (.*?)$/gm, "<h3>$1</h3>");
+  html = html.replace(/^## (.*?)$/gm, "<h2>$1</h2>");
+  html = html.replace(/^# (.*?)$/gm, "<h1>$1</h1>");
+
+  // Lists: lines starting with * or - followed by space
+  const lines = html.split("\n");
+  let inList = false;
+  const processedLines = [];
+
+  for (let line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("* ") || trimmed.startsWith("- ")) {
+      if (!inList) {
+        processedLines.push("<ul style=\"margin-left: 1.5rem; margin-top: 0.5rem; margin-bottom: 0.5rem;\">");
+        inList = true;
+      }
+      processedLines.push(`<li>${trimmed.substring(2)}</li>`);
+    } else {
+      if (inList) {
+        processedLines.push("</ul>");
+        inList = false;
+      }
+      processedLines.push(line);
+    }
+  }
+  if (inList) {
+    processedLines.push("</ul>");
+  }
+
+  html = processedLines.join("\n");
+
+  // Convert line breaks to <br> (excluding block elements to keep layout clean)
+  html = html.replace(/\n/g, "<br>");
+
+  return html;
+}
+
 function addMessage(text, type) {
   const message = document.createElement("div");
   message.className = `message ${type}`;
-  message.textContent = text;
+  if (type === "bot") {
+    message.innerHTML = parseMarkdown(text);
+  } else {
+    message.textContent = text;
+  }
   chatMessages.appendChild(message);
   chatMessages.scrollTop = chatMessages.scrollHeight;
 }

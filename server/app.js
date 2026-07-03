@@ -174,7 +174,7 @@ app.post('/api/assistant', asyncHandler(async (req, res) => {
     const model = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
     const prompt = `You are a Citizen Empowerment assistant for India. Reply in ${language === 'hi' ? 'Hindi' : language === 'te' ? 'Telugu' : 'English'}. Be concise, practical, and safety-aware. Never ask for OTP, PIN, passwords, or full identity numbers. Context schemes: ${JSON.stringify(matches.map((s) => ({ name: s.name, description: s.description })))}. Citizen question: ${message}`;
     const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -185,8 +185,17 @@ app.post('/api/assistant', asyncHandler(async (req, res) => {
     if (!geminiRes.ok) {
       const errorText = await geminiRes.text();
       console.warn(`Gemini API returned error status ${geminiRes.status}:`, errorText);
+      let parsedError = errorText;
+      try {
+        const parsed = JSON.parse(errorText);
+        parsedError = parsed.error?.message || errorText;
+      } catch (e) {}
       const fallbackReply = await fallback();
-      return res.json({ reply: fallbackReply, source: 'fallback', matches });
+      return res.json({ 
+        reply: `[Gemini API Error ${geminiRes.status}: ${parsedError}]. Fallback: ${fallbackReply}`, 
+        source: 'fallback', 
+        matches 
+      });
     }
 
     const data = await geminiRes.json();
@@ -194,7 +203,11 @@ app.post('/api/assistant', asyncHandler(async (req, res) => {
     if (data.error) {
       console.warn("Gemini API error payload:", data.error);
       const fallbackReply = await fallback();
-      return res.json({ reply: fallbackReply, source: 'fallback', matches });
+      return res.json({ 
+        reply: `[Gemini API Error: ${data.error.message || JSON.stringify(data.error)}]. Fallback: ${fallbackReply}`, 
+        source: 'fallback', 
+        matches 
+      });
     }
 
     const reply = data?.candidates?.[0]?.content?.parts?.map((p) => p.text).join('\n').trim();
@@ -203,7 +216,11 @@ app.post('/api/assistant', asyncHandler(async (req, res) => {
   } catch (error) {
     console.error("Gemini API call failed with exception:", error);
     const fallbackReply = await fallback();
-    res.json({ reply: fallbackReply, source: 'fallback', matches });
+    res.json({ 
+      reply: `[Gemini Exception: ${error.message}]. Fallback: ${fallbackReply}`, 
+      source: 'fallback', 
+      matches 
+    });
   }
 }));
 
