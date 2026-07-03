@@ -15,14 +15,25 @@ export const securityHeaders = (_req, res, next) => {
   next();
 };
 
-export const corsMiddleware = cors({
-  origin(origin, callback) {
-    if (!origin || !isProduction || config.corsOrigins.includes(origin)) {
-      return callback(null, true);
+export const corsMiddleware = (req, res, next) => {
+  const corsOptions = {
+    origin(origin, callback) {
+      if (!origin || !isProduction || config.corsOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      try {
+        const originUrl = new URL(origin);
+        if (originUrl.hostname === req.hostname) {
+          return callback(null, true);
+        }
+      } catch (err) {
+        // Ignore invalid URL formats in Origin header
+      }
+      return callback(new ApiError(403, 'Origin is not allowed by CORS policy.'));
     }
-    return callback(new ApiError(403, 'Origin is not allowed by CORS policy.'));
-  }
-});
+  };
+  cors(corsOptions)(req, res, next);
+};
 
 export const rateLimiter = (req, _res, next) => {
   // Bypass rate limiting entirely during local development

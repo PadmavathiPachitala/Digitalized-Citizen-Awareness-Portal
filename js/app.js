@@ -756,16 +756,30 @@ if (chatForm && chatMessages) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: question, language: languageSelect?.value || "en", history: conversation.slice(-8) })
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const payload = await response.json();
       chatMessages.querySelector(".message.loading")?.remove();
-      const reply = payload.reply || "I can help with schemes, documents, eligibility, scholarships, farmer support, pensions, and health benefits.";
-      addMessage(reply, "bot");
-      conversation.push({ role: "assistant", text: reply });
-    } catch {
+      
+      if (payload && payload.reply) {
+        addMessage(payload.reply, "bot");
+        conversation.push({ role: "assistant", text: payload.reply });
+      } else {
+        throw new Error("Empty reply in response payload");
+      }
+    } catch (err) {
+      console.warn("Chatbot API fetch failed, using local offline fallback:", err);
       chatMessages.querySelector(".message.loading")?.remove();
       const lq = question.toLowerCase();
       const match = keywordReplies.find((r) => r.keywords.some((kw) => lq.includes(kw)));
-      addMessage(match ? match.text : "The assistant is temporarily unavailable. Try asking about schemes, documents, eligibility, or cyber safety.", "bot");
+      const fallbackReply = match 
+        ? match.text 
+        : "The assistant is temporarily offline. I can still help you with standard schemes, documents, eligibility, and cyber safety if you ask about them.";
+      addMessage(fallbackReply, "bot");
+      conversation.push({ role: "assistant", text: fallbackReply });
     }
   });
 }
@@ -790,7 +804,10 @@ if (searchResultsContainer) {
     searchResultsContainer.innerHTML = `<div class="list-grid">${Array(3).fill(renderSkeletonCard()).join("")}</div>`;
 
     fetch(`${API_BASE}/api/search?q=${encodeURIComponent(query)}`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error("Search response error");
+        return r.json();
+      })
       .then((payload) => {
         const results = payload.results || [];
         if (results.length > 0) {
@@ -855,6 +872,9 @@ const renderComparison = async () => {
   const ids = selectedCompare.map((item) => item.slug).join(",");
   try {
     const response = await fetch(`${API_BASE}/api/compare?ids=${encodeURIComponent(ids)}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
     const payload = await response.json();
     const rows = payload.schemes || [];
     compareResults.innerHTML = `
@@ -913,7 +933,10 @@ if (compareSelect && compareAdd) {
 const updatesList = document.querySelector("[data-updates-list]");
 if (updatesList) {
   fetch(`${API_BASE}/api/updates`)
-    .then((r) => r.json())
+    .then((r) => {
+      if (!r.ok) throw new Error("Updates response error");
+      return r.json();
+    })
     .then((payload) => {
       const updates = payload.updates || [];
       updatesList.innerHTML = updates.length
@@ -938,7 +961,10 @@ if (updatesList) {
 const scamsList = document.querySelector("[data-scams-list]");
 if (scamsList) {
   fetch(`${API_BASE}/api/scams`)
-    .then((r) => r.json())
+    .then((r) => {
+      if (!r.ok) throw new Error("Scams response error");
+      return r.json();
+    })
     .then((payload) => {
       const scams = payload.scams || [];
       scamsList.innerHTML = scams
@@ -974,6 +1000,9 @@ if (feedbackForm && feedbackResult) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(Object.fromEntries(new FormData(feedbackForm).entries()))
       });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       const payload = await response.json();
       feedbackResult.innerHTML = `<h2>${payload.saved ? "Thank you!" : "Feedback received"}</h2><p>${payload.saved ? "Your feedback was saved successfully." : payload.message || "Your feedback could not be saved yet."}</p>`;
       if (payload.saved) feedbackForm.reset();

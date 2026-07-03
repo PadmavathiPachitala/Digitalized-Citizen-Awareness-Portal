@@ -84,16 +84,15 @@ app.post('/api/assistant', asyncHandler(async (req, res) => {
   const schemes = await listSchemes(req.supabase);
   const matches = schemes
     .filter((s) => {
-      const content = [s.name, s.description, s.category, s.eligibility]
+      const content = [s.name, s.description, s.category, s.eligibility, s.audience]
         .join(' ')
         .toLowerCase();
-      const q = queryLower.slice(0, 80);
-      if (q.length < 3) {
-        const escapedQ = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex = new RegExp(`\\b${escapedQ}\\b`, 'i');
-        return regex.test(content);
-      }
-      return content.includes(q);
+      const q = queryLower.slice(0, 120);
+      if (content.includes(q)) return true;
+
+      const importantKeywords = ['student', 'scholarship', 'education', 'farmer', 'agriculture', 'kisan', 'pension', 'senior', 'health', 'insurance', 'document', 'scam', 'fraud', 'loan', 'business', 'women'];
+      const queryTokens = q.split(/[^a-z0-9]+/).filter(t => t.length >= 3);
+      return queryTokens.some(token => importantKeywords.includes(token) && content.includes(token));
     })
     .slice(0, 4);
 
