@@ -13,7 +13,7 @@ import { corsMiddleware, securityHeaders, rateLimiter } from './middleware/secur
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { asyncHandler, cleanString } from './utils/api.js';
 import { listSchemes, searchAll, recommendSchemes, compareSchemes } from './services/schemeService.js';
-import { listGovernmentUpdates, listAwarenessContent, saveFeedback, listFaqs } from './services/contentService.js';
+import { listGovernmentUpdates, listAwarenessContent, saveFeedback, listFaqs, listDocuments } from './services/contentService.js';
 
 dotenv.config();
 
@@ -96,6 +96,24 @@ app.post('/api/assistant', asyncHandler(async (req, res) => {
     })
     .slice(0, 4);
 
+  const documents = await listDocuments(req.supabase);
+  const matchedDocs = documents
+    .filter((d) => {
+      const content = [d.name, d.purpose].join(' ').toLowerCase();
+      const q = queryLower.slice(0, 120);
+      
+      const docTokens = d.name.toLowerCase().split(/[^a-z0-9]+/);
+      const queryTokens = q.split(/[^a-z0-9]+/);
+      
+      return queryTokens.some(token => {
+        if (token.length < 3) return false;
+        if (/licen|lican|licae/i.test(token) && d.name.toLowerCase().includes('license')) return true;
+        if (/aadha|adhar/i.test(token) && d.name.toLowerCase().includes('aadhaar')) return true;
+        return docTokens.includes(token) || d.name.toLowerCase().includes(token) || content.includes(token);
+      });
+    })
+    .slice(0, 2);
+
   const fallback = async () => {
     const queryLower = message.toLowerCase();
     
@@ -134,13 +152,50 @@ app.post('/api/assistant', asyncHandler(async (req, res) => {
       }
       return 'Never share OTP, PIN, passwords, Aadhaar full number, or banking details. For cyber financial fraud in India, call 1930 and report at cybercrime.gov.in.';
     }
+
+    // Match documents first! If a user is specifically asking for a document (like driving license)
+    if (matchedDocs.length) {
+      const doc = matchedDocs[0];
+      const reqDocs = Array.isArray(doc.documents_required)
+        ? doc.documents_required
+        : typeof doc.documents_required === 'string' && doc.documents_required.startsWith('{')
+        ? doc.documents_required.slice(1, -1).split(',').map(s => s.replace(/^"|"$/g, '').trim())
+        : [doc.documents_required || ''];
+
+      const processSteps = Array.isArray(doc.process)
+        ? doc.process
+        : typeof doc.process === 'string' && doc.process.startsWith('{')
+        ? doc.process.slice(1, -1).split(',').map(s => s.replace(/^"|"$/g, '').trim())
+        : [doc.process || ''];
+
+      let responseText = `### ${doc.name}\n\n`;
+      responseText += `* **Purpose**: ${doc.purpose || 'No purpose description available.'}\n\n`;
+      
+      if (reqDocs.length && reqDocs[0]) {
+        responseText += `* **Required Documents**:\n`;
+        reqDocs.forEach(r => { responseText += `  - ${r}\n`; });
+        responseText += `\n`;
+      }
+      
+      if (processSteps.length && processSteps[0]) {
+        responseText += `* **How to Apply**:\n`;
+        processSteps.forEach((step, idx) => { responseText += `  ${idx + 1}. ${step}\n`; });
+        responseText += `\n`;
+      }
+      
+      if (doc.link && doc.link !== '#') {
+        responseText += `[Official Website &rarr;](${doc.link})`;
+      }
+      
+      return responseText.trim();
+    }
     
     if (/document|certificate|proof|card/i.test(queryLower)) {
       if (language === 'hi') {
         return 'सामान्य दस्तावेजों में आधार कार्ड, निवास प्रमाण, आय प्रमाण पत्र, बैंक पासबुक, फोटो और जाति प्रमाण पत्र (यदि लागू हो) शामिल हैं। कृपया अंतिम आवश्यकताओं को सत्यापित करने के लिए आधिकारिक सरकारी पोर्टल का उपयोग करें।';
       }
       if (language === 'te') {
-        return 'సాధారణ పత్రాలలో ఆధార్ కార్డ్, నివాస ధృవీకరణ పత్రం, ఆదాయ ధృవీకరణ పత్రం, బ్యాంక్ పాస్‌బుక్, ఫోటో మరియు వర్గం ధృవీకరణ పత్రం (వర్తిస్తే) ఉంటాయి. తుది అవసరాల కోసం అధికారిక పోర్టల్‌ని ధృవీకరించండి.';
+        return 'సాధారణ పత్రాలలో ఆధార్ కార్డ్, నివాస ధృవీకరణ పత్రం, ఆదాయ ధృవీకరణ పత్రం, బ్యాంక్ పాసబుక్, ఫోటో మరియు వర్గం ధృవీకరణ పత్రం (వర్తిస్తే) ఉంటాయి. తుది అవసరాల కోసం అధికారిక పోర్టల్‌ని ధృవీకరించండి.';
       }
       return 'Common documents include Aadhaar, address proof, income certificate, bank details, photograph, and category certificate if applicable. Always verify final requirements on the official portal.';
     }
@@ -171,7 +226,7 @@ app.post('/api/assistant', asyncHandler(async (req, res) => {
 
   try {
     const model = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
-    const prompt = `You are a Citizen Empowerment assistant for India. Reply in ${language === 'hi' ? 'Hindi' : language === 'te' ? 'Telugu' : 'English'}. Be concise, practical, and safety-aware. Never ask for OTP, PIN, passwords, or full identity numbers. Context schemes: ${JSON.stringify(matches.map((s) => ({ name: s.name, description: s.description })))}. Citizen question: ${message}`;
+    const prompt = `You are a Citizen Empowerment assistant for India. Reply in ${language === 'hi' ? 'Hindi' : language === 'te' ? 'Telugu' : 'English'}. Be concise, practical, and safety-aware. Never ask for OTP, PIN, passwords, or full identity numbers. Context schemes: ${JSON.stringify(matches.map((s) => ({ name: s.name, description: s.description })))}, Context documents: ${JSON.stringify(matchedDocs.map((d) => ({ name: d.name, purpose: d.purpose, required_documents: d.documents_required, process: d.process, link: d.link })))}, Citizen question: ${message}`;
     const geminiRes = await fetch(
       `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
@@ -217,7 +272,6 @@ app.post('/api/assistant', asyncHandler(async (req, res) => {
     });
   }
 }));
-
 app.post('/api/feedback', asyncHandler(async (req, res) => {
   if (!req.body.message) return res.status(400).json({ error: 'Feedback message is required' });
   const result = await saveFeedback(req.supabase, req.body);
